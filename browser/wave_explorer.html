@@ -1,0 +1,539 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Optical D²NN Wave Explorer</title>
+    <style>
+        :root {
+            --bg: #0a0a0a;
+            --card: #161616;
+            --accent: #00f2ff;
+            --text: #e0e0e0;
+            --dim: #888;
+        }
+
+        body {
+            margin: 0;
+            font-family: 'Inter', system-ui, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        header {
+            padding: 1rem 2rem;
+            background: var(--card);
+            border-bottom: 1px solid #333;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        header h1 {
+            margin: 0;
+            font-size: 1.2rem;
+            font-weight: 600;
+            letter-spacing: 1px;
+            color: var(--accent);
+        }
+
+        .main-container {
+            flex: 1;
+            display: flex;
+            gap: 2rem;
+            padding: 2rem;
+            align-items: center;
+            justify-content: center;
+        }
+
+        #digit-selector {
+            width: 120px;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+
+        .digit-btn {
+            background: var(--card);
+            border: 1px solid #444;
+            color: var(--text);
+            padding: 10px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 1.1rem;
+            transition: all 0.2s;
+            text-align: center;
+        }
+
+        .digit-btn:hover {
+            border-color: var(--accent);
+            background: #222;
+        }
+
+        .digit-btn.active {
+            background: var(--accent);
+            color: black;
+            border-color: var(--accent);
+            box-shadow: 0 0 15px rgba(0, 242, 255, 0.4);
+        }
+
+        .explorer-container {
+            display: flex;
+            flex-direction: row;
+            gap: 40px;
+            align-items: center;
+            background: var(--card);
+            padding: 2rem;
+            border-radius: 12px;
+            border: 1px solid #222;
+        }
+
+        .canvas-area {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        #stage-label {
+            margin-bottom: 10px;
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--dim);
+        }
+
+        canvas {
+            image-rendering: pixelated;
+            width: 400px;
+            height: 400px;
+            background: black;
+            border-radius: 4px;
+            box-shadow: 0 0 30px rgba(0, 242, 255, 0.1);
+        }
+
+        .controls {
+            width: 100%;
+            margin-top: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .slider-container {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        input[type="range"] {
+            flex: 1;
+            appearance: none;
+            background: #333;
+            height: 4px;
+            border-radius: 2px;
+            outline: none;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            appearance: none;
+            width: 18px;
+            height: 18px;
+            background: var(--accent);
+            border-radius: 50%;
+            cursor: pointer;
+            box-shadow: 0 0 10px rgba(0, 242, 255, 0.5);
+        }
+
+        #z-value {
+            font-family: monospace;
+            width: 80px;
+            text-align: right;
+            color: var(--dim);
+        }
+
+        .toggle-container {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+        }
+
+        .toggle-btn {
+            background: #222;
+            border: 1px solid #444;
+            color: var(--text);
+            padding: 6px 16px;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 0.8rem;
+            transition: all 0.2s;
+        }
+
+        .toggle-btn.active {
+            background: #333;
+            border-color: var(--accent);
+            color: var(--accent);
+        }
+
+        .stats-area {
+            display: flex;
+            flex-direction: column;
+            width: 200px;
+            gap: 12px;
+        }
+
+        .bin-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .bin-label {
+            width: 20px;
+            font-size: 14px;
+            font-weight: bold;
+            color: #666;
+        }
+
+        .bin-bar-bg {
+            flex-grow: 1;
+            height: 12px;
+            background: #222;
+            border-radius: 6px;
+            overflow: hidden;
+        }
+
+        .bin-bar-fill {
+            height: 100%;
+            background: #00d2ff;
+            width: 0%;
+            transition: width 0.1s ease;
+        }
+
+        .bin-row.winner .bin-bar-fill {
+            background: #00ff88;
+            box-shadow: 0 0 10px rgba(0, 255, 136, 0.4);
+        }
+
+        .bin-row.winner .bin-label {
+            color: #fff;
+        }
+
+        .info-panel {
+            width: 250px;
+            padding: 1rem;
+            background: rgba(255,255,255,0.03);
+            border-radius: 8px;
+            font-size: 0.85rem;
+            line-height: 1.5;
+            color: var(--dim);
+        }
+
+        .info-panel strong {
+            color: var(--text);
+            display: block;
+            margin-bottom: 0.4rem;
+            text-transform: uppercase;
+            font-size: 0.75rem;
+            letter-spacing: 0.5px;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>OPTICAL WAVE EXPLORER</h1>
+    </header>
+
+    <div class="main-container">
+        <div class="explorer-container">
+            <div id="digit-selector">
+                <!-- Buttons generated by JS -->
+            </div>
+
+            <div class="canvas-area">
+                <div id="stage-label">INPUT PLANE</div>
+                <canvas id="wave-canvas" width="64" height="64"></canvas>
+                
+                <div class="controls">
+                    <div class="slider-container">
+                        <label style="font-size:0.8rem; color:#666">Z</label>
+                        <input type="range" id="z-slider" min="0" max="49" value="0">
+                        <span id="z-value">0.00 cm</span>
+                    </div>
+                    <div class="toggle-container">
+                        <button id="p1-btn" class="toggle-btn active">PHASE 1 (D²NN)</button>
+                        <button id="p2b-btn" class="toggle-btn">PHASE 2B (4F)</button>
+                        <button id="p2c-btn" class="toggle-btn">PHASE 2C (ODCNN)</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="stats-area">
+                <strong style="font-size:11px; color:#555; letter-spacing:1px; margin-bottom:5px;">DETECTOR INTENSITY</strong>
+                <div id="bins-container">
+                    <!-- Bins generated by JS -->
+                </div>
+            </div>
+        </div>
+
+        <div class="info-panel">
+            <strong>System Architecture</strong>
+            <div id="info-text">
+                Phase 1 model uses 9.6 cm free-space propagation with a learned diffractive mask at 4.8 cm.
+            </div>
+            <br>
+            <strong>Physics Specs</strong>
+            λ: 520 nm<br>
+            Pixel: 8 µm<br>
+            Aperture: 512 µm
+        </div>
+    </div>
+
+    <script src="data.js"></script>
+    <script>
+        // State
+        let currentPhase = 1;
+        let currentDigit = 0;
+        let currentZ = 0;
+        
+        let p1Volume = null;
+        let p2bVolume = null;
+        let p2cVolume = null;
+        let binFills = [];
+        let binRows = [];
+
+        // DOM Elements
+        const canvas = document.getElementById('wave-canvas');
+        const ctx = canvas.getContext('2d');
+        const zSlider = document.getElementById('z-slider');
+        const zValue = document.getElementById('z-value');
+        const stageLabel = document.getElementById('stage-label');
+        const infoText = document.getElementById('info-text');
+        const binsContainer = document.getElementById('bins-container');
+
+        function base64ToUint8(base64) {
+            const binary = atob(base64);
+            const bytes = new Uint8Array(binary.length);
+            for (let i = 0; i < binary.length; i++) {
+                bytes[i] = binary.charCodeAt(i);
+            }
+            return bytes;
+        }
+
+        function init() {
+            if (typeof META === 'undefined') {
+                document.body.innerHTML = "<div style='color:red; padding:2rem;'>Error: data.js not loaded.</div>";
+                return;
+            }
+
+            // 1. Setup Digits
+            const selector = document.getElementById('digit-selector');
+            for (let i = 0; i < 10; i++) {
+                const btn = document.createElement('button');
+                btn.className = 'digit-btn' + (i === 0 ? ' active' : '');
+                btn.textContent = i;
+                btn.onclick = () => {
+                    document.querySelectorAll('.digit-btn').forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    currentDigit = i;
+                    render();
+                };
+                selector.appendChild(btn);
+            }
+
+            // 2. Setup Bin Bars
+            for (let i = 0; i < 10; i++) {
+                const row = document.createElement('div');
+                row.className = 'bin-row';
+                row.innerHTML = `
+                    <div class="bin-label">${i}</div>
+                    <div class="bin-bar-bg"><div class="bin-bar-fill"></div></div>
+                `;
+                binsContainer.appendChild(row);
+                binRows.push(row);
+                binFills.push(row.querySelector('.bin-bar-fill'));
+            }
+
+            // 3. Events
+            zSlider.oninput = (e) => {
+                currentZ = parseInt(e.target.value);
+                render();
+            };
+
+            document.getElementById('p1-btn').onclick = () => {
+                currentPhase = 1;
+                document.getElementById('p1-btn').classList.add('active');
+                document.getElementById('p2b-btn').classList.remove('active');
+                infoText.textContent = "Phase 1 model uses 9.6 cm free-space propagation with a learned diffractive mask at 4.8 cm.";
+                render();
+            };
+
+            document.getElementById('p2b-btn').onclick = () => {
+                currentPhase = 2;
+                document.getElementById('p2b-btn').classList.add('active');
+                document.getElementById('p1-btn').classList.remove('active');
+                document.getElementById('p2c-btn').classList.remove('active');
+                infoText.textContent = "Phase 2b uses a 4f correlator system. Lenses perform Fourier transforms, and the mask filters spatial frequencies.";
+                render();
+            };
+
+            document.getElementById('p2c-btn').onclick = () => {
+                currentPhase = 3;
+                document.getElementById('p2c-btn').classList.add('active');
+                document.getElementById('p1-btn').classList.remove('active');
+                document.getElementById('p2b-btn').classList.remove('active');
+                infoText.textContent = "Phase 2c is the hybrid ODCNN: a tiled multi-kernel 4f front-end feeding a 5-layer D²NN classifier.";
+                render();
+            };
+
+            // 4. Data
+            p1Volume = base64ToUint8(P1_DATA_B64);
+            p2bVolume = base64ToUint8(P2B_DATA_B64);
+            p2cVolume = base64ToUint8(P2C_DATA_B64);
+            
+            render();
+        }
+
+        function drawBinsOverlay() {
+            const size = META.grid_size;
+            let layout;
+            let half;
+
+            if (currentPhase === 3) {
+                // Phase 2c: 5x2 grid
+                layout = [];
+                for(let r=0; r<2; r++) for(let c=0; c<5; c++) layout.push([(r+1)/3, (2*c+1)/10]);
+                half = Math.floor(size * 15 / 200);
+            } else {
+                // Phase 1/2b
+                layout = [
+                    [1/6, 1/4], [1/6, 2/4], [1/6, 3/4],
+                    [1/2, 1/5], [1/2, 2/5], [1/2, 3/5], [1/2, 4/5],
+                    [5/6, 1/4], [5/6, 2/4], [5/6, 3/4]
+                ];
+                half = Math.floor(size / 16);
+            }
+
+            ctx.strokeStyle = 'rgba(255, 0, 0, 0.5)';
+            ctx.lineWidth = 0.5;
+            layout.forEach(([ry, rx]) => {
+                const cy = Math.floor(ry * size);
+                const cx = Math.floor(rx * size);
+                ctx.strokeRect(cx - half, cy - half, half * 2, half * 2);
+            });
+        }
+
+        function calculateStats(slice) {
+            const size = META.grid_size;
+            let layout;
+            let half;
+
+            if (currentPhase === 3) {
+                layout = [];
+                for(let r=0; r<2; r++) for(let c=0; c<5; c++) layout.push([(r+1)/3, (2*c+1)/10]);
+                half = Math.floor(size * 15 / 200);
+            } else {
+                layout = [
+                    [1/6, 1/4], [1/6, 2/4], [1/6, 3/4],
+                    [1/2, 1/5], [1/2, 2/5], [1/2, 3/5], [1/2, 4/5],
+                    [5/6, 1/4], [5/6, 2/4], [5/6, 3/4]
+                ];
+                half = Math.floor(size / 16);
+            }
+
+            const sums = new Array(10).fill(0);
+            let maxVal = 0;
+            layout.forEach(([ry, rx], idx) => {
+                const cy = Math.floor(ry * size);
+                const cx = Math.floor(rx * size);
+                let sum = 0;
+                for (let y = cy - half; y < cy + half; y++) {
+                    for (let x = cx - half; x < cx + half; x++) {
+                        if (y >= 0 && y < size && x >= 0 && x < size) {
+                            sum += slice[y * size + x];
+                        }
+                    }
+                }
+                sums[idx] = sum;
+                if (sum > maxVal) maxVal = sum;
+            });
+
+            sums.forEach((s, i) => {
+                const p = maxVal > 0 ? (s / maxVal) * 100 : 0;
+                binFills[i].style.width = p + '%';
+                binRows[i].classList.toggle('winner', s === maxVal && maxVal > 0);
+            });
+        }
+
+        function render() {
+            if (!p1Volume || !p2bVolume || !p2cVolume) return;
+
+            let vol;
+            if (currentPhase === 1) vol = p1Volume;
+            else if (currentPhase === 2) vol = p2bVolume;
+            else vol = p2cVolume;
+
+            const zSteps = META.z_steps;
+            const size = META.grid_size;
+            let totalZ;
+            if (currentPhase === 1) totalZ = META.p1_z_total;
+            else if (currentPhase === 2) totalZ = META.p2b_z_total;
+            else totalZ = META.p2c_z_total;
+
+            // Z update
+            const zVal = (currentZ / (zSteps - 1)) * totalZ * 100;
+            zValue.textContent = zVal.toFixed(2) + " cm";
+
+            // Stage Label
+            let isDetector = false;
+            if (currentPhase === 1) {
+                if (currentZ === 0) stageLabel.textContent = "INPUT PLANE";
+                else if (currentZ < 25) stageLabel.textContent = "PROPAGATING TO MASK...";
+                else if (currentZ === 25) stageLabel.textContent = "AT DIFFRACTIVE MASK";
+                else if (currentZ < 49) stageLabel.textContent = "PROPAGATING TO DETECTOR...";
+                else { stageLabel.textContent = "DETECTOR PLANE"; isDetector = true; }
+            } else if (currentPhase === 2) {
+                const p = currentZ / (zSteps - 1);
+                if (p < 0.2) stageLabel.textContent = "INPUT FIELD";
+                else if (p < 0.5) stageLabel.textContent = "FOURIER TRANSFORM (FFT)";
+                else if (p < 0.7) stageLabel.textContent = "AT FOURIER MASK";
+                else if (p < 0.9) stageLabel.textContent = "INVERSE TRANSFORM (IFFT)";
+                else { stageLabel.textContent = "DETECTOR PLANE (POOLED)"; isDetector = true; }
+            } else {
+                // Phase 2c
+                if (currentZ < 4) stageLabel.textContent = "4F: INPUT TO SPECTRUM";
+                else if (currentZ < 7) stageLabel.textContent = "4F: AT FOURIER MASK";
+                else if (currentZ < 11) stageLabel.textContent = "4F: SPECTRUM TO CONV";
+                else if (currentZ < 49) {
+                    const layer = Math.floor((currentZ - 11) / 8) + 1;
+                    stageLabel.textContent = `D²NN: LAYER ${layer} / 5`;
+                } else {
+                    stageLabel.textContent = "DETECTOR PLANE";
+                    isDetector = true;
+                }
+            }
+
+            // Draw Wave
+            const offset = (currentDigit * zSteps * size * size) + (currentZ * size * size);
+            const slice = vol.subarray(offset, offset + size * size);
+            const imgData = ctx.createImageData(size, size);
+            for (let i = 0; i < slice.length; i++) {
+                const color = MAGMA_LUT[slice[i]];
+                imgData.data[i * 4] = color[0];
+                imgData.data[i * 4 + 1] = color[1];
+                imgData.data[i * 4 + 2] = color[2];
+                imgData.data[i * 4 + 3] = 255;
+            }
+            ctx.putImageData(imgData, 0, 0);
+
+            if (isDetector) drawBinsOverlay();
+            calculateStats(slice);
+        }
+
+        init();
+    </script>
+</body>
+</html>

@@ -1,6 +1,8 @@
 # D²NN Optical MNIST: Differentiable Optical Neural Networks
 
 This repository contains a differentiable simulation of Optical Neural Networks (ONNs) for MNIST classification. The project follows a progression from simple diffractive layers (D²NN) to translation-invariant hybrid architectures (ODCNN).
+### 🚀 [Run this project in Google Colab](D2NN_MNIST_Explorer.ipynb)
+
 
 ## Project Architecture
 

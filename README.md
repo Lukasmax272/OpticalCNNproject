@@ -1,8 +1,8 @@
 # D²NN Optical MNIST: Differentiable Optical Neural Networks
 
-This repository contains a differentiable simulation of Optical Neural Networks (ONNs) for MNIST classification. The project follows a progression from simple diffractive layers (D²NN) to translation-invariant hybrid architectures (ODCNN).
 ### 🚀 [Run this project in Google Colab](D2NN_MNIST_Explorer.ipynb)
 
+This repository contains a differentiable simulation of Optical Neural Networks (ONNs) for MNIST classification. The project follows a progression from simple diffractive layers (D²NN) to translation-invariant hybrid architectures (ODCNN).
 
 ## Project Architecture
 
@@ -66,3 +66,9 @@ For sharing with someone who doesn't want to set up a local environment:
 
 ### Zip Archive
 If sharing a snapshot, ensure you include the `results/` folder so they don't have to re-train the models to see the benchmarks.
+
+## Interactive Wave Explorer
+The project includes a web-based tool to visualize wave propagation in 3D:
+1. Navigate to the `browser/` directory.
+2. Open **`wave_explorer.html`** in a modern web browser (Chrome or Firefox recommended).
+3. This tool allows you to interactively explore how light-fields transform as they pass through the diffractive masks.

@@ -1,5 +1,5 @@
-# OpticalCNNproject
-Lukas' optical CNN python simulation
+# D²NN Optical MNIST: Differentiable Optical Neural Networks
+
 This repository contains a differentiable simulation of Optical Neural Networks (ONNs) for MNIST classification. The project follows a progression from simple diffractive layers (D²NN) to translation-invariant hybrid architectures (ODCNN).
 
 ## Project Architecture
@@ -49,3 +49,18 @@ To compare all trained variants:
 ```bash
 python benchmark.py --plot-all
 ```
+
+## Sharing the Project
+
+### GitHub (Recommended)
+The most efficient way to share is a private or public GitHub repository. This allows others to track the "Phase" progression through the commit history.
+
+### Google Colab
+For sharing with someone who doesn't want to set up a local environment:
+1. Upload the code to a GitHub repo.
+2. Create a simple `.ipynb` notebook.
+3. Add a cell: `!git clone <your-repo-url> && pip install -r <repo>/requirements.txt`.
+4. This allows them to run training and benchmarking on a T4 GPU immediately.
+
+### Zip Archive
+If sharing a snapshot, ensure you include the `results/` folder so they don't have to re-train the models to see the benchmarks.

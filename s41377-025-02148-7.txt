@@ -1,0 +1,1315 @@
+Li et al. Light: Science & Applications           (2026) 15:32 www.nature.com/lsa
+https://doi.org/10.1038/s41377-025-02148-7
+ARTICLE Open Access
+Model-free optical processors using in situ
+reinforcement learning with proximal policy
+optimization
+Yuhang Li 1,2, Shiqi Chen 1,2,T i n g y uG o n g3 and Aydogan Ozcan 1,2,4✉
+Abstract
+Optical computing holds promise for high-speed, energy-ef ﬁcient information processing, with diffractive optical
+networks emerging as a ﬂexible platform for implementing task-speci ﬁc transformations. A challenge, however, is the
+effective optimization and alignment of the diffractive layers, which is hindered by the dif ﬁculty of accurately
+modeling physical systems with their inherent hardware imperfections, noise, and misalignments. While existing in situ
+optimization methods offer the advantage of direct training on the physical system without explicit system modeling,
+they are often limited by slow convergence and unstable performance due to inef ﬁcient use of limited measurement
+data. Here, we introduce a model-free reinforcement learning approach utilizing Proximal Policy Optimization (PPO)
+for the in situ training of diffractive optical processors. PPO ef ﬁciently reuses in situ measurement data and constrains
+policy updates to ensure more stable and faster convergence. We validated our method through both simulations and
+experiments across a range of in situ learning tasks, including targeted energy focusing through a random diffuser,
+image generation, aberration correction, and optical image classi ﬁcation, demonstrating in each task better
+convergence and performance. Our strategy operates directly on the physical system and naturally accounts for
+unknown real-world imperfections, eliminating the need for prior system knowledge or modeling. By enabling faster
+and more accurate training under realistic experimental constraints, this in situ reinforcement learning approach could
+offer a scalable framework for various optical and physical systems governed by complex, feedback-driven dynamics.
+Introduction
+As the demand for faster, more ef ﬁcient arti ﬁcial intel-
+ligence (AI) computation grows, physical neural networks
+(PNNs), which perform computation using analog sys-
+tems, have emerged as an alternative to traditional digital
+processors. By leveraging physical processes such as light
+propagation, electrical response, or acoustic vibration,
+PNNs offer the potential for ultra-low-latency, energy-
+efﬁcient inference and edge computing
+1–4. This paradigm
+is especially promising in the domain of optical comput-
+ing, where the input information is rapidly processed using
+thin optical components
+5. A variety of optical platforms
+have been explored, including diffractive optical net-
+works6–9, integrated photonic neural networks 10–13, and
+optical reservoir computing 14–17, each offering unique
+advantages for accelerating light-based computation.
+Designing optical computing systems typically involves
+a two-step process: ﬁrst, digitally emulating and opti-
+mizing the physical parameters of the hardware in a
+simulated environment; and second, deploying the opti-
+mized con ﬁguration into a real-world physical sys-
+tem
+6,13,18–20. In silico training methods rely on physics-
+based forward models or neural network surrogates to
+construct digital twins of PNNs, which are then optimized
+in silico for speci ﬁc tasks, as shown in Fig. 1a. However,
+this simulation-driven in silico approach faces inherent
+limitations. Accurately modeling the physical system is
+often undermined by the simulation-to-reality gap
+21–23;
+real-world systems are affected by noise, optical mis-
+alignments, and fabrication or device imperfections that
+© The Author(s) 2026
+Open AccessThis article is licensed under a Creative Commons Attribution 4.0 International License, which permits use, sharing, adaptation, distribution andreproduction
+in any medium or format, as long as you give appropriate credit to the original author(s) and the source, provide a link to the Creative Commons licence,and indicate if
+changes were made. The images or other third party material in this article are included in the article’s Creative Commons licence, unless indicated otherwise in a credit line to the material. If
+material is not included in the article’s Creative Commons licence and your intended use is not permitted by statutory regulation or exceeds the permitted use, you will need to obtain
+permission directly from the copyright holder. To view a copy of this licence, visithttp://creativecommons.org/licenses/by/4.0/.
+Correspondence: Aydogan Ozcan ( ozcan@ucla.edu)
+1Electrical and Computer Engineering Department, University of California, Los
+Angeles, CA, USA
+2California NanoSystems Institute (CNSI), University of California, Los Angeles,
+CA, USA
+Full list of author information is available at the end of the article
+1234567890():,;1234567890():,;
+1234567890():,;
+1234567890():,;
+
+--PAGE_BREAK--
+
+are dif ﬁcult to accurately model or know a priori 24. Even
+when a reasonable model exists, simulating physical
+processes requires ﬁne discretization of space and time,
+making optimization computationally expensive and
+susceptible to numerical errors
+25,26. Some of the recent
+approaches have explored a hybrid strategy by combining
+digital and physical elements during training. In these
+physics-aware training methods, a ﬁxed physical system
+performs the forward pass, while a co-optimized digital
+model computes the backward pass via gradient-based
+updates
+1,27. Although hybrid strategies that combine
+physical feedback with a digital model relax the strict
+requirement of having a perfect digital twin, they still
+depend on maintaining a close correspondence between
+the digital and physical worlds, a challenge that grows
+with system complexity. If the system drifts or exhibits
+unmodeled/unknown dynamics or aberrations, the gra-
+dient estimates become unreliable.
+To eliminate this dependence on accurate models,
+model-free training algorithms have recently gained
+attention
+2,28–33. In particular, in situ training methods —
+where the optimization is performed directly on the
+physical hardware —have begun to emerge. One set of
+approaches involves optical implementations of back-
+propagation, demonstrated in both linear and nonlinear
+optical networks, where gradients are computed using
+forward and backward light propagation. While powerful,
+these approaches demand precise optical alignments,
+which might limit their practical applications in diverse or
+noisy experimental settings
+29,34. More ﬂexible model-free
+optimization techniques, such as gradient-free and evo-
+lutionary algorithms, have also been explored
+35–38. These
+include methods based on perturbation strategies —such
+as Simultaneous Perturbation Stochastic Approximation
+(SPSA)—and those based on sampling from distribu-
+tions32,37,39–41, including Genetic Algorithms (GA), Evo-
+lutionary Strategies (ES), and swarm optimization.
+Reinforcement learning (RL) has also been applied to the
+optical domain, including integrated photonics and opti-
+cal communication networks
+42–45. More recently, score-
+function-based gradient estimators have also been used to
+train optical systems, where policy gradient (PG) methods,
+including natural gradient variants that re ﬁne the update
+direction, directly optimize the system ’s response without
+Input Trainable modulation 
+components Output Target
+Input Modulation components Output Target
+Trainable 
+policy
+a
+b
+Forward
+(in silico)
+Backward
+(gradient flow)
+Model-based training (Gradient backpropagation)
+Model-free training (Probabilistic policy optimization)
+Forward
+(in situ)
+Backward
+(gradient flow)
+Reward
+signal
+Fig. 1 Conceptual overview of model-based and model-free optical learning. a Model-based training relies on gradient backpropagation
+through a differentiable in silico model of the system. Error gradients are calculated and propagated backward to directly update the system ’s
+trainable components. b Model-free training employs probabilistic policy optimization to work directly with the physical hardware (in situ). A
+trainable policy generates system parameters, and a reward signal calculated from the measured output is used to update the policy. This
+reinforcement learning-based method treats the physical system as a black box and does not require a differentiable model or gradient ﬂow through
+the components
+Li et al. Light: Science & Applications           (2026) 15:32 Page 2 of 14
+
+--PAGE_BREAK--
+
+an explicit physical model 28,46–50; for example, a fully
+autonomous and high-performance optical neural net-
+work
+51 was demonstrated using a vertical-cavity surface
+emitting laser for model-free training of optical pro-
+cessors suitable for various inference tasks. These
+approaches interact directly with the physical system for
+the forward pass and use reward signals to guide updates
+—without requiring explicit gradient computation
+through the hardware; see Fig. 1b. Although these efforts
+have shown promising results, a key bottleneck shared by
+all these in situ model-free approaches is the relatively
+high cost of physical measurements. Unlike digital com-
+putations, capturing each physical measurement is a slow,
+sequential process constrained by the speed of optical
+hardware, e.g., spatial light modulators (SLMs) and optical
+sensors. This makes data collection time-consuming.
+Moreover, standard methods typically discard collected
+samples after each update, resulting in inef ﬁcient data
+usage and unreliable gradient estimates. As a result,
+updating the policy parameters based on each new batch
+of measurements can make data inef ﬁciency a critical
+issue. Furthermore, standard PG methods often suffer
+from unstable convergence, signi ﬁcantly compounding
+this data inefﬁciency problem by requiring more iterations
+to reach an optimal solution. These drawbacks are espe-
+cially problematic in physical systems, where each policy
+update requires real-world measurements and is therefore
+time-consuming and resource-intensive.
+Here, we introduce a model-free, in situ reinforcement
+learning framework based on Proximal Policy Optimiza-
+tion (PPO) for training optical processors. PPO improves
+optical training ef ﬁciency by enabling multiple digital
+updates per batch of captured optical measurements and
+ensures stable convergence by constraining policy chan-
+ges, even under noisy experimental conditions
+52.W e
+numerically and experimentally demonstrated the effec-
+tiveness of this in situ optical learning approach across a
+variety of tasks —including energy focusing through a
+random, unknown diffuser, holographic image generation,
+aberration correction, and optical image classi ﬁcation.
+Crucially, our PPO-based method achieved substantially
+faster convergence and improved ﬁnal performance
+across all tasks, without relying on physical system models
+or explicit gradient calculations. We anticipate that this
+robust, data-ef ﬁcient training strategy will signi ﬁcantly
+advance the practical deployment of optical processors
+and it offers a generalizable framework for optimizing
+complex, feedback-driven physical systems.
+Results
+Policy gradient is a class of reinforcement learning
+algorithms that directly optimize a parameterized policy,
+i.e., a function that maps system states to actions, by
+adjusting its parameters to maximize an expected reward.
+These methods estimate gradients that guide the policy to
+iteratively increase the likelihood of actions yielding
+higher rewards, while decreasing the likelihood of actions
+with lower rewards. In our in situ optical learning fra-
+mework, we utilized PPO to achieve stability, data ef ﬁ-
+ciency, and enhanced performance across various optical
+tasks. As shown in Fig. 2a, the PPO-based training strat-
+egy improves the in situ reinforcement learning process
+by enabling the reuse of output measurements. In each
+training round, we sample M phase proﬁles φ
+j
+no M
+j¼1
+from
+the current policy πθ, display them sequentially on the
+SLM, and record the resulting optical measurements,
+corresponding to a certain desired optical task. These
+measurements are then used to estimate the advantage
+function and compute the PPO loss
+53; see “Methods” for
+details. PPO performs multiple optimization steps using
+the same set of measured physical/experimental data.
+This signi ﬁcantly improves data ef ﬁciency—an essential
+beneﬁt in time-constrained in situ optical experiments.
+To prevent these repeated updates from causing
+instability or divergence, we used a clipped surrogate
+objective that constrains how much the policy can change
+in each step. The PPO objective is de ﬁned as
+52:
+JPPO θðÞ ¼ /C0 Eφ/C24 πθ min r φ; θðÞ A0 φðÞ ; clip r φ; θðÞ ; 1 /C0 ϵ; 1 þ ϵðÞ A0 φðÞðÞ½/C138
+ð1Þ
+where r φ; θðÞ ¼ πθ φðÞ
+πθold φðÞ is the probability ratio between the
+current policy πθ φðÞ and previous policy πθold φðÞ , and
+A0 φðÞ denotes the normalized advantage function, which
+measures how much better or worse a sampled phase
+proﬁle φ performed compared to the average (see
+“Methods” for details). The clip operator constrains the
+probability ratio of rðφ; θÞ to the range ½1 /C0 ϵ; 1 þ ϵ/C138 ,
+where ϵ is a hyperparameter limiting the extent of the
+policy update to ensure stability. The core clipping
+mechanism prevents overly large updates by enforcing a
+conservative change in the policy distribution, thereby
+ensuring stable convergence even when using repeated
+samples of physical measurement data. We performed
+this surrogate loss optimization for K iterations using the
+same batch of collected data before sampling new data. By
+reusing collected data and preventing overly large policy
+shifts, PPO offers a practical balance between exploration
+and exploitation, making it well-suited for data-
+constrained experimental scenarios.
+We ﬁrst validated our PPO-based model-free reinfor-
+cement learning strategy in a simulated optical classi ﬁ-
+cation task, where a diffractive layer was optimized to
+classify phase-encoded MNIST digits
+54 (see “Methods” for
+details). Figure 2b quantitatively compares the con-
+vergence of PG and PPO. The PPO strategy using a single
+diffractive layer achieved a ﬁnal test accuracy of ~80% and
+Li et al. Light: Science & Applications           (2026) 15:32 Page 3 of 14
+
+--PAGE_BREAK--
+
+3.2 times faster than PG. This accelerated convergence
+demonstrates PPO ’s effectiveness in optimizing complex
+optical transformations through reinforcement learning.
+Furthermore, Fig. 2c visualizes the evolution of the learned
+phase patterns over training iterations, showing that PPO
+rapidly learned clear and structured phase patterns. This
+comparative analysis con ﬁrms PPO ’s superiority in both
+convergence speed and training stability, establishing it as
+a compelling reinforcement learning approach for optical
+processor design and implementation.
+Following these simulations, we experimentally eval-
+uated the performance of our PPO-based in situ reinfor-
+cement learning framework on an energy focusing task as
+shown in Fig. 3a. A trainable phase pattern displayed on
+an SLM modulated the incoming wavefront, and the
+resulting intensity distribution was recorded on an image
+sensor plane subdivided into ten detection regions. The
+objective was to maximize the energy in the designated
+target region relative to the total energy across all ten
+regions. This selective beam focusing task provides a
+benchmark for precisely shaping and controlling light
+using diffractive optics. Figure 3b demonstrates that PPO
+achieved signi ﬁcantly faster and more effective energy
+focusing onto target/desired regions. This advantage is
+visually con ﬁrmed in Fig. 3c, where the PPO-trained
+system produced a high-intensity focal spot earlier and
+b
+PPO vs. PG test accuracy
+In silico model baseline for a single layer (87%)
+Sequential 
+phase input
+Single diffractive layer
+Output score
+Policy
+N (μ, σ2) 
+Detector plane
+Clipped update
+Proximal policy optimization (PPO)
+Samples reused for
+multiple updates
+…
+a
+Sampling
+M phase profiles 
+Target
+class
+c
+3.2x faster
+PG
+Iter: 25 Iter: 125 Iter: 250 Iter: 375
+Iter: 500 Iter: 1250 Iter: 1875 Iter: 2500
+Iter: 500 Iter: 1250 Iter: 2500
+PPO Model-based
+Classification accuracy (%)
+75
+1 2
+M
+Iter: 25 Iter: 125 Iter: 250 Iter: 375
+500μm
+2 π
+0Iterations
+0 500 1000 1500 2000 2500
+0
+20
+40
+60
+80
+PG
+PPO
+2 π
+0
+π
+0
+Fig. 2 Proximal Policy Optimization (PPO) for in situ training of a diffractive optical classi ﬁer. a Schematic of the PPO training framework. A
+policy generates phase patterns for a single diffractive layer. The physical output is measured, and PPO uses a clipped update rule and reuses the
+measured data for multiple optimization steps to ef ﬁciently train the policy. b Numerical test accuracy comparison between PPO and standard Policy
+Gradient (PG). PPO achieves higher classi ﬁcation accuracy and converges faster. The dashed line denotes the performance thresholds, de ﬁned as 85%
+of the in silico model performance for a single-layer diffractive con ﬁguration. c Evolution of the learned diffractive phase patterns at different
+iterations of PPO and PG compared with the in silico model (denoted as Model-based)
+Li et al. Light: Science & Applications           (2026) 15:32 Page 4 of 14
+
+--PAGE_BREAK--
+
+with greater clarity. We further conducted experiments
+with a random, unknown diffuser (Fig. 4c) inserted
+between the SLM and the image sensor plane, as illu-
+strated in Fig. 4a. The curves in Fig. 4b and the results in
+Fig. 4d further highlight PPO ’s robustness, demonstrating
+its ability to maintain effective focusing even in the pre-
+sence of unknown optical perturbations introduced by a
+random diffuser. In addition, our simulation-based ana-
+lysis (Supplementary Fig. S1a) revealed that the learned
+phase pattern, although trained with a speci ﬁc diffuser at a
+ﬁxed position, maintained an energy focusing ratio of
+>50% within a diffuser lateral shift of approximately ± 16
+µm. These results provide evidence that our model-free
+PPO framework can enable robust and highly ef ﬁcient
+in situ optimization of a diffractive optical processor. We
+further ﬁne-tuned the trained phase pattern under
+different diffuser displacements for a limited number of
+learning iterations, as shown in Supplementary Figs. S1b-
+d. Only 10 iterations were suf ﬁcient to achieve an energy
+ratio above 50% for displacements within ± 40 µm. Fur-
+thermore, with 35 iterations, the energy ratio was main-
+tained above 50% across the entire tested lateral
+misalignment range of ± 160 µm. We also numerically
+compared our method with respect to PG and genetic
+algorithms (GA). As shown in Supplementary Fig. S2a,
+PPO achieved faster and more stable convergence,
+whereas GA exhibited only transient early improvements
+and failed to reach comparable ﬁnal performance. We
+further compared PPO with PG and GA on another task,
+as shown in Supplementary Fig. S2b, where phase aber-
+rations were introduced at the encoded phase pattern.
+PPO once again showed faster convergence and better
+a
+c
+b
+Trainable phase
+pattern
+Experimental energy ratio in target region 
+Output intensity
+pattern
+Policy gradient Proximal policy optimization
+Iter: 1 Iter: 1Iter: 7 Iter: 7
+Iter: 13 Iter: 13 Iter: 19 Iter: 19
+Iter: 25 Iter: 25 Iter: 30 Iter: 30
+65%
+Captured
+image
+Phase 
+pattern
+Captured
+image
+Phase 
+pattern
+Captured
+image
+Phase 
+pattern
+Captured
+image
+Phase 
+pattern
+L = 9.6 cm
+01 0500 /g80m5 0 0  /g80m 2 π
+ER = 11.8% ER = 24.0%
+ER = 38.0% ER = 49.7%
+ER = 60.5% ER = 65.4%
+ER = 11.0% ER = 18.4%
+ER = 25.9% ER = 33.9%
+ER = 42.2% ER = 48.9%
+Time (s)
+0 50 100 150 200 250
+Energy ratio of target region (%)
+10
+20
+30
+40
+50
+60
+PG
+PPO
+Fig. 3 Experimental reinforcement learning results for in situ optimization of targeted energy focusing. a A schematic of the physical setup,
+wherein a trainable phase pattern is optimized in real-time to focus light onto a designated target area while minimizing energy in the other
+9 selected areas. b The energy ratio (ER) concentrated in the target/desired region is plotted as a function of the experimental reinforcement learning
+time. c Time-lapse visualization of the captured intensity patterns and the corresponding SLM phase patterns for PG (left) and PPO (right) during the
+optimization
+Li et al. Light: Science & Applications           (2026) 15:32 Page 5 of 14
+
+--PAGE_BREAK--
+
+performance within a limited number of optimization
+iterations. These results and analyses further con ﬁrm the
+advantages of PPO for ef ﬁcient and robust in situ training
+of diffractive optical processors.
+We next evaluated our in situ reinforcement learning
+framework on a holographic image generation task, where
+a phase-only SLM was optimized to produce a target
+image at the sensor plane, as shown in Fig. 5a. We
+experimentally tested the system on two distinct targets: a
+synthetic grating and a natural image ( “Boat”). As shown
+in Fig. 5b, PPO achieved a higher Peak Signal-to-Noise
+Ratio (PSNR) in less training time. The visual evolution of
+the grating image generation in Fig. 5c further con ﬁrms
+that PPO produced sharper, higher- ﬁdelity images using
+fewer iterations. This ability to ef ﬁciently learn complex
+optical transformations in situ highlights our method ’s
+potential for applications such as holographic displays and
+lensless imaging.
+We further extended the PPO-based reinforcement
+learning framework to an in situ image improvement task
+designed to correct for system aberrations and random
+misalignments. For these experiments, we used a ran-
+domly misaligned optical generative model —comprising a
+digital encoder and an optical decoder (SLM) —that were
+jointly pre-trained in silico
+9. This optical generative model
+used a digital encoder with 85 M parameters, and the
+learning of the student optical model was distilled from a
+ﬁne-tuned diffusion model trained on 800 Van Gogh
+ab
+Trainable phase
+pattern
+Experimental energy ratioin target region 
+Output
+58%
+L = 9.6 cm 
+Random
+diffuser 
+c Policy gradient Proximal policy optimization
+Holographic diffuser
+0500 /g80m 1
+Iter: 1 Iter: 7
+Iter: 13 Iter: 19
+Iter: 25
+5 mm
+Iter: 30
+d
+Iter: 1 Iter: 7
+Iter: 13 Iter: 19
+Iter: 25 Iter: 30
+ER = 6.9% ER = 12.5%
+ER = 18.7% ER = 26.0%
+ER = 33.8% ER = 40.2%
+ER = 7.5% ER = 18.6%
+ER = 30.5% ER = 43.3%
+ER = 52.5% ER = 57.8%
+Energy ratio of target region (%)10
+20
+30
+40
+50
+60
+Time (s)
+0 50 100 150 200 250
+PG
+PPO
+Fig. 4 Experimental reinforcement learning results for in situ optimization of targeted energy focusing with a random, unknown diffuser
+inserted between the SLM and the image sensor plane. a A schematic of the physical setup, wherein a trainable phase pattern is optimized in
+real-time to focus light through an unknown, random diffuser onto a designated target area while minimizing energy in the other 9 selected areas.
+b The energy ratio (ER) concentrated in the target region is plotted as a function of experimental reinforcement learning time. c Photograph of the
+unknown, random diffuser used in the experiment. d Time-lapse evolution of the captured intensity patterns for PG (left) and PPO (right) during the
+optimization with the random diffuser inserted
+Li et al. Light: Science & Applications           (2026) 15:32 Page 6 of 14
+
+--PAGE_BREAK--
+
+paintings55—which was used as the teacher model (only
+during training). The student optical model, trained with
+the teacher, provides an optical phase-only generative
+seed of 1000×1000 pixels for each new image to be gen-
+erated in a snapshot, calculated from random noise of size
+80×80. The snapshot student model ’s optical decoder
+(size 800 × 800) was jointly trained with the digital enco-
+der. In other words, different from Fig. 5, here the image
+to be projected is a novel image created by a snapshot
+optical generative model. After the training of the snap-
+shot optical generative model, to mitigate the random
+misalignment-related aberrations of the optical hardware
+and improve the output quality of the generated images,
+we used PPO to ﬁne-tune and adaptively optimize the
+phase pattern of the optical decoder SLM, directly on the
+hardware (Fig. 6a). This in situ reinforcement learning
+process allows the generative system to learn and com-
+pensate for the physical imperfections/misalignments in
+the optical hardware. Our experimental results
+demonstrate a consistent improvement in image quality
+across various image generation tasks. As quanti ﬁed in
+Fig. 6b, this PPO-based calibration led to a marked
+increase in PSNR. The visual results of these experiments,
+shown in Fig. 6c, also illustrate this enhancement. With
+the in situ reinforcement learning, an improvement in
+image clarity and a more accurate match to the corre-
+sponding in silico-generated images can be observed.
+These experimental results further establish our PPO-
+based reinforcement learning framework as a powerful
+and ef ﬁcient method for correcting experimental aberra-
+tions and misalignments in dynamic task-speci ﬁc optical
+systems.
+Finally, we validated the general applicability of our
+PPO-based in situ learning framework for optical com-
+puting on an image classi ﬁcation task, speci ﬁcally classi-
+fying handwritten digits (MNIST dataset). As a proof of
+concept, the experimental setup (Fig. 7a) used an
+800 × 800 region of the SLM as a single layer, where the
+a
+c
+b
+Trainable phase
+pattern
+Experimental reconstruction quality
+Generated
+hologram
+Target Policy gradient Proximal policy optimization
+t=0s t=1093s t=2059s t=3225s t=0s t=1093s t=2059s t=3225s
+t=0s t=1093s t=2059s t=3225s t=0s t=1093s t=2059s t=3225s
+0.5
+0
+1
+01
+Target (C = 1)d PG (t=3225 s, C = 0.61) PPO (t=3225 s, C = 0.78) 
+150 /g80m
+256 /g80m 
+Time (s)
+0 1000 1500 2000 3000 3500500 2500
+PSNR (dB)
+10
+12
+16
+14
+18
+22
+20
+24
+PG Boat
+PPO Boat
+PG Grating
+PPO Grating
+Fig. 5 Experimental reinforcement learning results for in situ holographic image generation. a Schematic of the experimental setup for
+holographic image projection, where a trainable phase pattern generates a selected target image (the initial condition at t = 0 s is a uniform phase
+pattern). b Reconstruction quality (PSNR) over time for two target images, a ‘Boat’ and a ‘Grating’. PPO (shown with orange lines) consistently
+achieves higher ﬁdelity faster than PG (blue lines). c Visual comparison of holographic image quality at different time points. PPO reconstructions
+(right) are clearer and more accurate than PG reconstructions (middle) at all stages. d A cross-sectional intensity pro ﬁles of the ‘Grating’ pattern.
+Contrast values (C) were calculated, showing that PPO achieves a higher contrast
+Li et al. Light: Science & Applications           (2026) 15:32 Page 7 of 14
+
+--PAGE_BREAK--
+
+input digit was simultaneously phase-encoded directly
+onto the same SLM plane. The trainable diffractive layer
+was optimized in situ to learn the class-speci ﬁc patterns
+and smartly guide the optical energy toward the detector
+corresponding to the correct digit class, i.e., performing
+all-optical image classi ﬁcation. Figure 7b plots the
+experimental test accuracy over in situ training epochs.
+We observed rapid improvement in classi ﬁcation perfor-
+mance during the initial training stages of the reinforce-
+ment learning process. Insets show examples of the
+ab
+Encoded phase
+pattern
+Aberration correction for optical generation
+Generated
+image
+Decoding layer
+c Target t = 0 s t = 2343 s
+Image 1Image 2Image 3Image 4
+t = 4641 s t = 6893 s
+0 1
+500 μm
+Random noise
+Digital encoder
+Time (s)
+0 72001 2 0 02 4 0 03 6 0 04 8 0 06 0 0 0
+PSNR (dB)
+16
+17
+18
+19
+20
+Image 1
+Image 2
+Image 3
+Image 4
+Average
+Fig. 6 In situ correction of misalignment-induced aberrations for synthesizing novel images through an optical generative model 9.
+a Schematic of the optical generative model, where a digital encoder transforms random noise into an encoded phase pattern, which is displayed on
+an SLM. This encoded phase pattern, projected by an SLM, then passes through a separate decoding SLM to form a novel image; different than Fig. 5,
+here the target images are novel, synthesized by an optical generative model. b Reconstruction quality (PSNR) as a function of the in situ training
+time for four different novel images created from random noise. The average performance (red line) shows a consistent improvement, demonstrating
+successful in situ aberration correction through reinforcement learning. c Visual results of the RL-based optimization process. The generated novel
+images from random input noise, initially aberrated at t = 0 s, become progressively clearer and more recognizable over time as the system learns
+in situ to compensate for aberrations
+Li et al. Light: Science & Applications           (2026) 15:32 Page 8 of 14
+
+--PAGE_BREAK--
+
+a
+c
+b
+Phase-encoded input
+Experimental test accuracy
+Class-specific
+detector
+Trainable diffractive layer
+Input Captured image Class score
+Test accuracy (%)
+Epoch
+1
+2
+0
+3
+4
+012
+789
+3456
+012
+789
+3456
+012
+789
+3456
+012
+789
+3456
+012
+789
+3456
+Input Captured image Class score
+5
+6
+8
+9
+7
+010 π
+200 μm
+012
+789
+3456
+012
+789
+3456
+012
+789
+3456
+012
+789
+3456
+012
+789
+3456
+0 20 40 60 80 100 120
+10
+0
+20
+30
+40
+50
+60
+70
+80
+200 μm
+Fig. 7 Experimental demonstration of in situ reinforcement learning for an all-optical diffractive image classi ﬁer. a A schematic of the
+optical setup where a trainable diffractive layer processes phase-encoded input images (to be classi ﬁed and never seen before) and directs the input
+light to a grid of 10 class-speci ﬁc detectors used for all-optical image classi ﬁcation. b Experimental test accuracy plotted against the in situ training
+epoch number, showing the learning progression of the physical system. Insets visualize the evolution of the output intensity patterns at various
+stages of the RL process; once converged, the learned phase pattern is ﬁxed and can be used to classify new test objects never seen before. c
+Classiﬁcation test examples for ten different handwritten digits {0, 1, …, 9}, never seen before. The ﬁnal learned phase pro ﬁle successfully directs the
+light from each input digit to its correct corresponding detector, as con ﬁrmed by the captured images and class scores
+Li et al. Light: Science & Applications           (2026) 15:32 Page 9 of 14
+
+--PAGE_BREAK--
+
+captured intensity patterns at selected epochs, clearly
+demonstrating how initially indistinct outputs evolved
+into clear and discriminative patterns as the in situ
+training progresses. Ten illustrative classi ﬁcation exam-
+ples for handwritten digits from “0” to “9” are visualized in
+Fig. 7c. Each digit, encoded as a phase input image, was
+transformed through the learned phase pro ﬁle. The
+experimentally captured images reveal clear peaks at the
+correct class-speci ﬁc detector positions. The corre-
+sponding class scores, derived from these measured
+intensities, conﬁrm that each digit was correctly identi ﬁed
+by the diffractive optical processor. Additional simulation
+results comparing PPO, PG, and GA are also provided in
+Supplementary Fig. S2c, where PG exhibited slower con-
+vergence and GA failed to train successfully. These results
+underscore the effectiveness of our PPO-based in situ
+learning method for directly training optical processors,
+offering a robust pathway for developing physical neural
+networks without reliance on digital twins or model-based
+error back-propagation.
+Discussion
+In this work, we introduced a practical and ef ﬁcient
+framework for the in situ training of diffractive optical
+processors using proximal policy optimization. Our
+model-free PPO-based reinforcement learning method
+effectively bypasses the gap between simulations and
+real-world experiments by learning directly from physical
+measurements. One of the key strengths of our frame-
+work is its signi ﬁcant improvement in in situ learning
+speed: by enabling multiple updates from a single batch
+of experimental data, PPO signi ﬁcantly reduces the
+number of physical measurements needed for con-
+vergence. The clipped surrogate objective used in PPO
+plays a pivotal role in this acceleration. By preventing
+large policy updates and enforcing stable improvement,
+PPO-based reinforcement learning ensures steady and
+robust convergence even under noisy, limited, or
+imperfect measurement conditions. This robustness
+allows for more aggressive optimization without sacri ﬁ-
+cing stability, further contributing to the speed-up. We
+validated this improvement through both simulations
+and experiments. For example, in our optical image
+classiﬁcation task, simulations showed that PPO achieved
+more than 3 ´ faster convergence compared to other RL
+methods. Similar advantages in learning speed were also
+observed in experimental results of targeted energy
+focusing and holographic image generation. Moreover,
+we also demonstrated the real-world experimental
+applicability of PPO-based reinforcement learning for
+in situ aberration corrections and optical image classi ﬁ-
+cation tasks, where the PPO-based training enabled
+robust and ef ﬁcient system optimization directly from
+physical feedback.
+Furthermore, we examined the sensitivity of our PPO-
+based framework to hyperparameters such as learning
+rate, sampling size, and the clipping factor ϵ, as shown in
+Supplementary Fig. S3. Across a broad range of settings,
+the training consistently converged with only minor
+differences in speed, indicating that the method was
+generally robust and did not require extensive hyper-
+parameter tuning. It is also worth mentioning that our
+in situ framework inherently compensates for some of the
+optical variations, such as wavelength shifts or defocus, if
+they are present during training, since the optimization is
+performed directly on the hardware, and it indirectly
+integrates all these factors or variations into the learned
+phase patterns. Notably, for all the results and analyses
+reported above, the wavelength was not explicitly speci-
+ﬁed or used in the training algorithm, as it is model-free.
+We further tested the robustness of the trained system
+using numerical simulations, when such variations
+occurred “after” training. As shown in Supplementary
+Figs. S4a,b, an optical classi ﬁer trained at 532 nm main-
+tained > 78.9% classi ﬁcation accuracy across a wavelength
+range of 520 /C0 545 nm, and preserved >60% accuracy
+under detector-plane axial defocus of approximately ±0.5
+cm. While performance may degrade for larger amounts
+of shifts, our framework allows rapid in situ retraining or
+ﬁne-tuning to ef ﬁciently adapt to new operating condi-
+tions, ensuring continued robust performance in a model-
+free environment.
+We also investigated the all-optical image classi ﬁer’s
+robustness to additional phase noise, ϕ
+nðx; y; tÞ, repre-
+senting pixel-wise phase shifts that vary across both spatial
+coordinates and time ( t), modeling various sources of
+experimental noise. As shown in Supplementary Fig. S4c,
+the trained optical classiﬁers achieved similar performance
+metrics under a noise-free condition ( ϕ
+n x; yðÞ ¼ 0), a ﬁxed
+phase offset ( ϕn x; yðÞ /C24 U½0; 2π/C138 ), and dynamic, time-
+varying random phase noise with varying magnitudes
+(ϕ
+n x; y; tðÞ /C24 U½0; 0:2π/C138 ; U½0; 0:4π/C138 ; U½0; 0:6π/C138 ). Although
+the performance degraded slightly at larger dynamic per-
+turbation ranges, the system still maintained ~70% accu-
+racy. Overall, these results demonstrate that our model-
+free reinforcement learning framework effectively adapts
+to systematic deviations while maintaining a stable per-
+formance despite random perturbations and noise.
+However, several limitations remain for further
+improvements. The current policy used Gaussian dis-
+tributions to sample trainable parameters of the optical
+system, which did not incorporate prior knowledge about
+the spatial properties of the physically realizable optical
+ﬁelds or structures. This can lead to inef ﬁcient explora-
+tion in a high-dimensional space
+56. To address this, future
+work could explore more sophisticated or expressive
+policy parameterizations, such as spatially correlated dis-
+tributions or generative physical priors trained of ﬂine to
+Li et al. Light: Science & Applications           (2026) 15:32 Page 10 of 14
+
+--PAGE_BREAK--
+
+guide the RL-based exploration in a physically conditioned
+subspace57–59. These approaches could substantially
+reduce the effective dimensionality of the search space,
+enabling faster learning with fewer iterations. Another
+promising future direction involves hybrid modeling
+methods that integrate coarse physical models with our
+data-driven PPO framework. In this case, an approximate
+model could guide the early stages of the training process
+or generate synthetic rollouts that accelerate policy learn-
+ing. As PPO continues to re ﬁne the policy using real-world
+measurements, the physical model itself could be iteratively
+updated to better align with the true system dynam-
+ics
+1,27,60,61. This closed-loop re ﬁnement can allow for
+improved initialization, reduced data requirements, and a
+synergistic blend of model-based and model-free learning.
+Such hybrid strategies are particularly valuable in complex
+or partially known/characterized physical systems.
+From a broader perspective, while our demonstrations
+have been for optical computing or information processing
+t a s k ss u c ha si m a g eg e n e r a t i o n, aberration correction, and
+optical image classiﬁcation, the underlying methodology is
+general and broadly applicable to other experimental
+learning tasks. Any physical system characterized by a
+measurable output and adjustable parameters within a
+feedback loop could potentially bene ﬁtf r o mP P O - b a s e d
+in situ reinforcement learning. This approach is particularly
+promising in ﬁelds like adaptive optics, nonlinear photonics,
+multi-mode ﬁber-optics and other domains where model-
+free, feedback-driven optimization methods are critical for
+achieving robust performance in real-world environ-
+ments
+5,62 that are particularly hard to model. Ultimately,
+this approach moves us toward intelligent, recon ﬁgurable
+physical systems that can autonomously learn and adapt
+directly from real-time interactions with their environment.
+Materials and methods
+Optimization objective
+Our diffractive optical system used an SLM to serve as
+both the input interface and the trainable optical mod-
+ulation processor. Let φ 2 R
+H ´ W denote the phase
+modulation pattern applied to the SLM. For a given
+optical input x
+i, the system performs a transformation
+f ðxi; φÞ, which corresponds to the light propagation and
+modulation governed by the phase mask φ. The resulting
+intensity distribution is measured by a digital camera. The
+goal is to train the system to approximate a desired optical
+transformation by minimizing the following loss:
+L φðÞ ¼
+1
+N
+XN
+i¼1
+fx i; φðÞ /C0 yi
+/C12/C12 /C12/C12/C12/C12 /C12/C12 2
+ð2Þ
+This loss is computed directly from physically measured
+intensities at the sensor plane. Since f ð/C1Þ represents the
+actual light propagation and detection process within our
+experimental setup, the optimization inherently captures
+all system nonidealities, imperfections, aberrations, mis-
+alignments and noise factors.
+Proximal policy optimization for in situ reinforcement
+learning
+We adopted a reinforcement learning approach by
+modeling the phase pattern φ as a random variable drawn
+from a distribution πθ, where θ denotes the trainable
+parameters of the policy. Speci ﬁcally, we chose a Gaussian
+distribution Nðμ; σ2Þ as our policy πθ, where θ denotes
+the mean ( μ) and the standard deviation ( σ) of this dis-
+tribution. The phase pattern displayed on the SLM is
+drawn from this Gaussian distribution. In our imple-
+mentation, the mean ( μ) serves as the primary trainable
+parameter, while the standard deviation ( σ) was ﬁxed at
+0.04. This standard deviation σ controls the level of ran-
+domness (i.e., exploration) in the sampled patterns,
+allowing the algorithm to explore the parameter space. In
+this setting, the expected loss becomes:
+J θðÞ ¼ E
+φ/C24 πθ L φðÞ½/C138 ð 3Þ
+The policy gradient is estimated using the likelihood-
+ratio trick:
+∇θJPG ¼/C0 Eφ/C24 πθ A φðÞ ∇θ log πθ φðÞ½/C138 ð4Þ
+where the advantage function AðφÞ is de ﬁned as the
+negative loss:
+A φðÞ ¼ /C0 L φðÞ ð 5Þ
+However, raw advantage estimates can vary signi ﬁcantly
+in scale across training batches or even within a batch,
+leading to unstable or inef ﬁcient updates. Normalizing the
+advantages to have a zero mean and unit variance helps
+mitigate this issue. Therefore, for convergence stability,
+the advantages are normalized across each batch to have
+zero mean and unit variance:
+A
+0 φðÞ ¼ A φðÞ /C0 μA
+σA
+ð6Þ
+where μA is the mean of all A φðÞ values within one round
+of measurements, and σA is the corresponding standard
+deviation.
+In our implementation, the data acquisition speed was
+limited to ~120 ms per image, primarily due to the SLM
+response time and the need for longer exposure to ensure
+a good signal-to-noise ratio under limited laser power. In
+contrast, updating the policy parameters digitally required
+only a few milliseconds, making it negligible compared to
+Li et al. Light: Science & Applications           (2026) 15:32 Page 11 of 14
+
+--PAGE_BREAK--
+
+the image acquisition time. By minimizing a surrogate
+objective with a clipped probability ratio de ﬁned in Eq. 1,
+PPO achieved fast convergence and improved
+performance.
+Our RL-based in situ training loop consists of the fol-
+lowing steps:
+1. Sampling: Sample M phase masks φj
+no M
+j¼1
+/C24 πθold
+2. Physical Measurement: For each φj, perform physical
+measurements over a batch of B inputs xifg B
+i¼1,
+yielding N ¼ M ´ B data points in total.
+3. Loss and Advantage Calculation : Compute the loss
+L φj
+/C16/C17
+in Eq. 2 and calculate the normalized
+advantage A0ðφjÞ in Eq. 6.
+4. Digital Policy Update : Perform K iterations of digital
+optimization (Eq. 1) on the policy parameters θ
+using the collected M ´ B data points, without
+acquiring new measurements. The probability ratio
+r φ; θðÞ is calculated numerically in each iteration.
+5. Policy Refresh : After K updates, set θ
+old ¼ θ to
+prepare for the next physical sampling and
+optimization round.
+6. Exit Condition : Repeat the above process until the
+maximum number of training epochs (e.g., 50-250)
+is reached. Upon termination, exit the loop and
+output the mean of π
+θ as the ﬁnal optimized
+parameters for the phase mask φ.
+Implementation details
+In the numerical validation of PPO-based in situ train-
+ing strategy shown in Fig. 2b, we simulated a single-layer
+diffractive system for handwritten digit classi ﬁcation.
+Speciﬁcally, the phase-encoded object was displayed
+centrally using 168 ´ 168 pixels with a 0 /C0 π phase range,
+and the trainable diffractive layer was 256 ´ 256 pixels
+with a 0 /C0 2π phase range. The pixel size was 8 μm. For
+the in silico single-layer baseline design, used for com-
+parison, the angular spectrum method was used to
+simulate propagation from the diffractive layer to the
+detector plane
+63, where the kernel can be written as:
+Hz f x; f y
+/C16/C17
+¼ exp 2 πjz
+ﬃﬃﬃﬃﬃﬃﬃﬃﬃﬃﬃﬃﬃﬃﬃﬃﬃﬃﬃﬃﬃﬃﬃ ﬃ
+1
+λ2 /C0 f 2
+x /C0 f 2
+y
+q/C16/C17
+; if
+ﬃﬃﬃﬃﬃﬃﬃﬃﬃﬃﬃﬃﬃﬃ ﬃ
+f 2
+x þ f 2
+y
+q
+/C20 1
+λ
+0; otherwise
+(
+ð7Þ
+where z is the free-space propagation distance, λ is the
+wavelength, f x and f y are the spatial frequencies along x
+and y, respectively. For in silico simulations, we set the
+propagation distance z as 9.6 cm and the wavelength λ ¼
+520 nm to match our experimental hardware, although
+these values were not used or necessary for our in situ
+reinforcement learning. The loss was calculated using a
+cross-entropy function on the summed intensity within 10
+distinct detector areas
+6.
+In the targeted energy focusing task, a diffractive layer
+comprising 128 ´ 128 pixels, each with a size of 16 μm,
+was employed. The layer was operated within a 0 /C0 2π
+phase range. The same cross-entropy loss function used
+above for optical classi ﬁcation was used to maximize the
+energy concentrated within the target region while
+simultaneously minimizing energy in all the other
+9 selected regions. The experiments also utilized a diffuser
+(Edmund Optics, 1° Diffusing Angle 2 ” x2 ” Unmounted
+Sheet) inserted between the SLM and the image sensor,
+using the same optical con ﬁguration.
+For the holographic image generation task, the phase
+pattern consisted of 256 ´ 256 pixels, each with a size of
+8 μm. The target image was 128 ´ 128 pixels with a pixel
+size of 5.86 μm, which followed the pixel size of the
+camera used. In the case of aberration correction for novel
+image generation from random noise (Fig. 6), we initi-
+alized the process using an optical generative model
+64.
+Subsequently, we implemented in situ optimization of the
+central 512 ´ 512 pixels with a pixel size of 16 μm. A 438 ´
+438-pixel region of interest (ROI), with a pixel size of
+5:86 μm, was selected and then resized to the target image
+dimension of 320 ´ 320 pixels (pixel size 8 μm). For both
+the holographic image generation and aberration correc-
+tion tasks, the energy level of the measured image was ﬁrst
+normalized to that of the target image. The Mean Squared
+Error (MSE) was then employed to calculate the loss
+between the normalized measurement and the target
+image. We additionally quanti ﬁed the generated gratings
+using a contrast metric. The grating contrast C was
+computed using:
+C ¼
+Imax /C0 Imin
+Imax þ Imin
+ð8Þ
+To compute Imax and Imin, the intensity values of the
+captured images were ﬁrst averaged over a 10-pixel-wide
+stripe orthogonal to the grating direction, then the max-
+imum and minimum values of this averaged pro ﬁle were
+extracted across the entire image.
+For each optimization round, we generated M different
+phase masks. For the energy focusing task, we selected
+M ¼ 32. For more complex tasks like holographic image
+generation and aberration correction, M ¼ 64 was used.
+As for the optical image classi ﬁcation task, we set M ¼
+128. In the optical classi ﬁcation task, each of these phase
+proﬁles was tested with B ¼ 8 different input handwritten
+digits, resulting in N ¼ 1024 total physical measurements
+per round. For all other tasks, each mask was measured
+once ( B ¼ 1). The collected data were then used to opti-
+mize the policy π
+θ following the training steps 1-6 out-
+lined earlier.
+Li et al. Light: Science & Applications           (2026) 15:32 Page 12 of 14
+
+--PAGE_BREAK--
+
+As discussed before, we reused the same measurements
+to update the training parameters multiple times —speci-
+ﬁcally, we performed K ¼ 4 digital optimization steps in
+Eq. 1 using the same batch of measured data. This strategy
+signiﬁcantly reduced the number of new physical mea-
+surements required per update, which is particularly
+important in hardware-in-the-loop optimization, where
+each measurement can be time-consuming. In our case,
+capturing a single image took ~120 ms, primarily due to
+the response time of the SLM and the exposure needed to
+achieve a suf ﬁcient signal-to-noise ratio. We used a small
+adjustment factor ( ϵ ¼ 0:02) in the PPO algorithm to
+control how much the phase distribution is allowed to
+change at each step. This clipping mechanism (Eq. 1)
+helped stabilize training by preventing large, abrupt
+changes to the policy.
+The optical setup consisted of a laser source (Fianium,
+520 nm), different types of SLMs and cameras depending
+on the task. For all the tasks, we used an SLM (HOLOEYE
+PLUTO-2.1, pixel pitch 8 μm, resolution 1920 ´ 1080) as
+the trainable optical component being controlled by RL.
+In the aberration correction task, the encoded input phase
+pattern was displayed on another SLM (Meadowlark XY
+Phase Series, pixel pitch 8 μm, resolution 1920 ´ 1200). A
+CMOS camera (PointGrey BFLY-PGE-12A2M-CS) was
+used for capturing the resulting light intensity patterns in
+the optical classi ﬁcation task, while another camera
+(Basler ace acA1920-40gm) was used for other tasks. All
+digital training was implemented using Python (version
+3.9.21) and PyTorch (version 2.1.2, Meta Platforms Inc.).
+This was performed on a workstation equipped with an
+NVIDIA GeForce RTX 2080 Ti GPU, an AMD Ryzen 5
+1600X CPU, and 32 GB of RAM. For optimizing the
+policy parameters, we utilized the Adam optimizer with a
+learning rate of 0.3.
+To maintain alignment and ensure robust performance
+during long runs, we incorporated a periodic calibration
+step for training the optical classi ﬁer. This procedure
+corrected for minor system shifts caused by mechanical
+vibrations or environmental factors. We periodically
+projected a ﬁxed random phase pattern and calculated the
+autocorrelation of the resulting image against a reference
+captured at the beginning. By estimating the spatial shift
+from this autocorrelation, we dynamically updated the
+camera’s region of interest, ensuring the in situ training
+process remained stable and ef ﬁcient.
+Acknowledgements
+A.O. is supported by the Army Research Of ﬁce (ARO), USA.
+Author details
+1Electrical and Computer Engineering Department, University of California, Los
+Angeles, CA, USA. 2California NanoSystems Institute (CNSI), University of
+California, Los Angeles, CA, USA. 3Computer Science Department, University of
+California, Los Angeles, CA, USA. 4Bioengineering Department, University of
+California, Los Angeles, CA, USA
+Author contributions
+Y.L. and T.G. conducted the numerical simulations. S.C. built the experimental
+setup, and Y.L. carried out the experiments, including data acquisition and
+processing. Y.L. and A.O. contributed to the preparation of the manuscript. A.O.
+supervised the research.
+Data availability
+All the data and methods needed to evaluate the conclusions of this work are
+presented in the main text. Additional data can be requested from the
+corresponding author (A.O.). The codes used in this work use standard libraries
+and scripts that are publicly available in PyTorch.
+Conﬂict of interest
+Aydogan Ozcan is an Editor for the journal, and no other author has reported
+any competing interests.
+Supplementary information The online version contains supplementary
+material available at https://doi.org/10.1038/s41377-025-02148-7.
+Received: 7 July 2025 Revised: 17 November 2025 Accepted: 27 November
+2025
+References
+1. Wright, L. G. et al. Deep physical neural networks trained with back-
+propagation.Nature 601,5 4 9–555 (2022).
+2. Momeni, A. et al. Backpropagation-free training of deep physical neural net-
+works. Science 382,1 2 9 7–1303 (2023).
+3. Momeni, A. et al. Physics-inspired ne uroacoustic computing based on tunable
+nonlinear multiple-scattering. Print at https://doi.org/10.48550/arXiv.2304.
+08380 (2023).
+4. Momeni, A. et al. Training of physical neural networks. Nature 645,5 3 –61
+(2024).
+5. Brunner, D. et al. Roadmap on neuromorphic photonics. Print at https://doi.
+org/10.48550/arXiv.2501.07917(2025).
+6. Lin, X. et al. All-optical machine learning using diffractive deep neural net-
+works. Science 361,1 0 0 4–1008 (2018).
+7. Yildirim, M. et al. Nonlinear p rocessing with linear optics. Nat. Photonics 18,
+1076–1082 (2024).
+8. Chang, J. L. et al. Hybrid optical-electronic convolutional neural networks with
+optimized diffractive optics for image classiﬁcation. Sci. Rep. 8, 12324 (2018).
+9. Chen, S. Q. et al. Optical generative models. Nature 644, 903–911 (2025).
+10. Shen, Y. C. et al. Deep learning with coherent nanophotonic circuits. Nat.
+Photonics11,4 4 1–446 (2017).
+11. Wetzstein, G. et al. Inference in arti ﬁcial intelligence with deep optics and
+photonics.Nature 588,3 9–47 (2020).
+12. Momeni, A. & Fleury, R. Electromagnetic wave-based extreme deep learning
+with nonlinear time-Floquet entanglement.Nat. Commun. 13, 2651 (2022).
+13. Hughes, T. W. et al. Wave physics as an analog recurrent neural network. Sci.
+Adv. 5, eaay6946 (2019).
+14. Vandoorne, K. et al. Experimental demonstration of reservoir computing on a
+silicon photonics chip.Nat. Commun. 5, 3541 (2014).
+15. Xia, F. et al. Deep learning with passive optical nonlinear mapping. Print at
+https://doi.org/10.48550/arXiv.2307.08558(2024).
+16. Duport, F. et al. All-optical reservoir computing. Opt. Express 20, 22783–22795
+(2012).
+17. Bu, T. et al. Ef ﬁcient optical reservoir computing for parallel data processing.
+Opt. Lett. 47, 3784–3787 (2022).
+18. Chen, Z. J. et al. Deep learning with coherent VCSEL neural networks. Nat.
+Photonics17,7 2 3–730 (2023).
+19. Furuhata, G., Niiyama, T. & Sunada, S. Physical deep learning based on optimal
+control of dynamical systems.Phys. Rev. Appl. 15, 034092 (2021).
+20. Liu, C. et al. A programmable diffractive deep neural network based on a
+digital-coding metasurface array.Nat. Electron. 5,1 1 3–122 (2022).
+21. Lillicrap, T. P. et al. Backpropagation and the brain. Nat. Rev. Neurosci. 21,
+335–346 (2020).
+22. Ruiz Euler, H. C. et al. A deep-learning approach to realizing functionality in
+nanoelectronic devices.Nat. Nanotechnol.15,9 9 2–998 (2020).
+Li et al. Light: Science & Applications           (2026) 15:32 Page 13 of 14
+
+--PAGE_BREAK--
+
+23. Scellier, B. & Bengio, Y. Equilibrium propagation: bridging the gap between
+energy-based models and backpropagation.Front. Comput. Neurosci. 11,2 4
+(2017).
+24. Mengu, D. et al. Misalignment resilient diffractive optical networks. Nano-
+photonics9, 4207–4219 (2020).
+25. Deng, R., Zhou, J. & Zhang, W. Y. Band limited communication with one-bit
+quantization and oversampling: transceiver design and performance evalua-
+tion. IEEE Trans. Commun. 69,8 4 5–862 (2021).
+26. Shi, L. et al. Towards real-time photorealistic 3D holography with deep neural
+networks.Nature 591,2 3 4–239 (2021).
+27. Spall, J., Guo, X. X. & Lvovsky, A. I. Hybrid training of optical neural networks.
+Optica. 9,8 0 3–811 (2022).
+28. Zhao, G. Y. & Zhou, R. J. Model-free computer-generated holography. Pro-
+ceedings of 2022 IEEE Region 10 Conference. 1-3 (IEEE, 2022).
+29. Hughes, T. W. et al. Training of photonic neural networks through in situ
+backpropagation and gradient measurement.Optica 5,8 6 4–871 (2018).
+30. López-Pastor, V. & Marquardt, F. Self-learning machines based on Hamiltonian
+echo backpropagation.P h y s .R e v .X13, 031020 (2023).
+31. Hermans, M. et al. Trainable hardwar e for dynamical computing using error
+backpropagation through physical media.Nat. Commun. 6, 6729 (2015).
+32. Gu, J. Q. et al. L
+2ight: enabling on-chip learning for optical neural networks via
+efﬁcient in-situ subspace optimization. Proceedings of the 35th International
+Conference on Neural Information Processing Systems. Curran Associates Inc.,
+662. Print at https://proceedings.neurips.cc/paper/2021/hash/
+48aedb8880cab8c45637abc7493ecddd-Abstract.html(2021).
+33. Hinton, G. The forward-forward algorithm: some preliminary investigations.
+Print at https://doi.org/10.48550/arXiv.2212.13345(2022).
+34. Pai, S. et al. Experimentally realized in situ backpropagation for deep learning
+in photonic neural networks. Science 380,3 9 8–404, https://doi.org/10.1126/
+science.ade8450(2023).
+35. Nøkland, A. Direct feedback alignment provides learning in deep neural
+networks. Proceedings of the 30th International Conference on Neural Infor-
+mation Processing Systems. (Curran Associates Inc., 2016) 1045-1053.
+36. Launay, J. et al. Hardware beyond backpropagation: a photonic co-processor
+for direct feedback alignment. Print at https://doi.org/10.48550/arXiv.2012.
+06373 (2020).
+37. Bueno, J. et al. Reinforcement learn ing in a large-scale photonic recurrent
+neural network.Optica. 5,7 5 6–760 (2018).
+38. Nakajima, M. et al. Physical deep learn ing with biologically inspired training
+method: gradient-free approach for physical hardware. Nat. Commun. 13,
+7847 (2022).
+39. Wang, C. H. et al. Memristor-based neural networks with weight simultaneous
+perturbation training.Nonlinear Dyn. 95,2 8 9 3–2906 (2019).
+4 0 . M c C a u g h a n ,A .N .e ta l .M u l t i p l e x e dg r adient descent: fast online training of
+modern datasets on hardware neural networks without backpropagation.APL
+Mach. Learn. 1, 026118 (2023).
+41. Zhang, H. et al. Ef ﬁcient on-chip training of optical neural networks using
+genetic algorithm.ACS Photonics 8, 1662–1672 (2021).
+42. Yan, Q. Q. et al. Multi-wavelength optical information processing with deep
+reinforcement learning.Light Sci. Appl. 14, 160 (2025).
+43. Li, S. Y. et al. OpticGAI: generative AI-aided deep reinforcement learning for
+optical networks optimization. Proceedings of the 1st SIGCOMM Workshop on
+Hot Topics in Optical Technologies an d Applications in Networking. (ACM,
+2024) 1-6.
+44. Natalino, C. & Monti, P. The optical RL-Gym: an open-source toolkit for
+applying reinforcement learning in optical networks. Proceedings of the 2020
+22nd International Conference on Transparent Optical Networks. (IEEE, 2020)
+1-5.
+45. Kanno, K., Naruse, M. & Uchida, A. Adaptive model selection in photonic
+reservoir computing by reinforcement learning.Sci. Rep. 10, 10062 (2020).
+46. Silver, D. et al. Deterministic policy gradient algorithms. Proceedings of the
+31st International Conference on Machine Learning. (JMLR.org, 2014) I-387-I-
+395.
+47. Song, Y. & Ermon, S. Generative mode ling by estimating gradients of the data
+distribution. Proceedings of the 33rd Conference on Neural Information
+Processing Systems. (NeurIPS, 2019).
+48. Zhao, Y. Y. et al. Gradient-assisted focusing light through scattering media.
+Opt.
+Lett. 46,1 5 1 8–1521 (2021).
+49. Zhao, G. Y., Shu, X. & Zhou, R. J. High-performance real-world optical com-
+puting trained by in situ gradient-based model-free optimization.IEEE Trans.
+Pattern Anal. Mach. Intell. 47,7 1 9 4–7205 (2025).
+50. Yang, J. M. et al. Anti-scattering light focusing by fast wavefront shaping based
+on multi-pixel encoded digital-micromirror device. Light Sci. Appl. 10,1 4 9
+(2021).
+51. Skalli, A. et al. Model-free front-to- end training of a large high performance
+laser neural network. Print athttps://doi.org/10.48550/arXiv.2503.16943(2025).
+52. Schulman, J. et al. Proximal polic y optimization algorithms. Print athttps://doi.
+org/10.48550/arXiv.1707.06347(2017).
+53. Mohamed, S. et al. Monte Carlo grad ient estimation in machine learning. J.
+M a c h .L e a r n .R e s .21, 132 (2020).
+54. Deng, L. The MNIST database of handwritten digit images for machine
+learning research [best of the web]. IEEE Signal Process. Mag. 29,1 4 1–142
+(2012).
+5 5 . R o m b a c h ,R .e ta l .H i g h - r e s o l u t i o nimage synthesis with latent diffusion
+models. Proceedings of 2022 IEEE/CVF Conference on Computer Vision and
+Pattern Recognition. (IEEE, 2022) 10674-10685.
+56. Altman, N. & Krzywinski, M. Th e curse(s) of dimensionality. Nat. Methods 15,
+399–400 (2018).
+5 7 . U l y a n o v ,D . ,V e d a l d i ,A .&L e m p i t s k y ,V .D e e pi m a g ep r i o r .Int. J. Computer Vis.
+128, 1867–1888 (2020).
+58. Niknam, F., Qazvini, H. & Lati ﬁ, H. Holographic optical ﬁeld recovery using a
+regularized untrained deep decoder network.Sci. Rep. 11, 10903 (2021).
+59. Li, R. J. et al. Physics-enhanced neu ral network for phase retrieval from two
+diffraction patterns.Opt. Express 30, 32680–32692 (2022).
+60. Peng, Y. F. et al. Neural holograph y with camera-in-the-loop training. ACM
+Trans. Graph. 39, 185 (2020).
+61. Chakravarthula, P. et al. Learned hard ware-in-the-loop phase retrieval for
+holographic near-eye displays.ACM Trans. Graph. 39, 186 (2020).
+62. de A. Belbute-Peres, F. et al. End-to-end differentiable physics for learning and
+control. Proceedings of the 32nd International Conference on Neural Infor-
+mation Processing Systems. (Curran Associates Inc., 2018) 7178-7189.
+6 3 . G o o d m a n ,J .W .I n t r o d u c t i o nt oF o u r i e rO p t i c s .( R o b e r t s&C o . ,2 0 0 5 ) .
+64. Chen, S., Li, Y., Wang, Y., Chen, H. & Ozcan, A. Optical generative models.
+Nature, 644, 903-911 (2025).
+Li et al. Light: Science & Applications           (2026) 15:32 Page 14 of 14

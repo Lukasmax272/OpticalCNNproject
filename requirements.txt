@@ -1,0 +1,12 @@
+# Core ML & RL (Removed [extra] to avoid Atari/ALE version conflicts)
+gymnasium==0.29.1
+stable-baselines3==2.3.2
+numpy==1.26.4
+
+# Physics & Data
+scipy==1.12.0
+matplotlib==3.8.3
+
+# Development
+tqdm
+tensorboard

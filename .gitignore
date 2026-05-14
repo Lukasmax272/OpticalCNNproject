@@ -1,0 +1,32 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+env/
+venv/
+ENV/
+
+# Distribution / Data
+data/
+results/*.npy
+results/*.pt
+results/*.json
+learned_phase_mask*.npy
+history*.npy
+*.npz
+*.zip
+
+# IDEs / AI Agents
+.agents/
+artifacts/
+.vscode/
+.idea/
+
+# Logs
+*.txt
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
